@@ -21,6 +21,7 @@ import com.mapbox.maps.plugin.locationcomponent.OnIndicatorPositionChangedListen
 import com.mapbox.maps.plugin.locationcomponent.location
 import de.zerowatermelons.paintthetown.databinding.ActivityMainBinding
 import java.lang.ref.WeakReference
+import kotlin.random.Random
 
 
 class MainActivity : AppCompatActivity() {

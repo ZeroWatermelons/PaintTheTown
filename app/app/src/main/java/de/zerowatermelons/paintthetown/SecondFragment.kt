@@ -3,20 +3,24 @@ package de.zerowatermelons.paintthetown
 import android.os.Bundle
 import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
+import android.view.View.OnTouchListener
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.appcompat.content.res.AppCompatResources
+import androidx.core.view.get
 import androidx.navigation.fragment.findNavController
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.mapbox.android.gestures.MoveGestureDetector
+import com.mapbox.bindgen.Value
+import com.mapbox.geojson.Geometry
 import com.mapbox.geojson.Point
-import com.mapbox.maps.CameraOptions
-import com.mapbox.maps.FreeCameraOptions
-import com.mapbox.maps.MapView
+import com.mapbox.maps.*
 import com.mapbox.maps.extension.style.expressions.dsl.generated.interpolate
 import com.mapbox.maps.plugin.LocationPuck2D
 import com.mapbox.maps.plugin.gestures.OnMoveListener
+import com.mapbox.maps.plugin.gestures.addOnMapClickListener
 import com.mapbox.maps.plugin.gestures.gestures
 import com.mapbox.maps.plugin.locationcomponent.OnIndicatorBearingChangedListener
 import com.mapbox.maps.plugin.locationcomponent.OnIndicatorPositionChangedListener
@@ -25,6 +29,7 @@ import com.mapbox.maps.plugin.viewport.state.ViewportState
 import com.mapbox.maps.plugin.viewport.viewport
 import de.zerowatermelons.paintthetown.databinding.FragmentSecondBinding
 import java.lang.ref.WeakReference
+import java.util.Random
 
 /**
  * A simple [Fragment] subclass as the second destination in the navigation.
@@ -40,14 +45,14 @@ class SecondFragment : Fragment() {
     private var point: Point? = null
 
     private val onIndicatorBearingChangedListener = OnIndicatorBearingChangedListener {
-        if(trackPosition) {
+        if (trackPosition) {
             //mapView.getMapboxMap().setCamera(CameraOptions.Builder().bearing(it).build())
         }
     }
 
     private val onIndicatorPositionChangedListener = OnIndicatorPositionChangedListener {
         point = it
-        if(trackPosition) {
+        if (trackPosition) {
             mapView.getMapboxMap().setCamera(CameraOptions.Builder().center(it).build())
             mapView.gestures.focalPoint = mapView.getMapboxMap().pixelForCoordinate(it)
         }
@@ -80,6 +85,7 @@ class SecondFragment : Fragment() {
         return binding.root
 
     }
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         fab = view.findViewById(R.id.fab)
@@ -96,19 +102,36 @@ class SecondFragment : Fragment() {
         }
 
     }
+
     private fun onMapReady() {
-        mapView.getMapboxMap().setCamera(
+        val mapboxMap = mapView.getMapboxMap()
+        mapboxMap.setCamera(
             CameraOptions.Builder()
                 .zoom(17.0)
                 .build()
         )
-        mapView.getMapboxMap().loadStyleUri(
-            com.mapbox.maps.Style.LIGHT
+        mapboxMap.loadStyleUri(
+            "mapbox://styles/fabiannowak/clanul8lp005d14o33kq78sg5/draft"
         ) {
             initLocationComponent()
             setupGesturesListener()
         }
+        mapView.setOnTouchListener { view, ev ->
+            val boxFrom = ScreenCoordinate(ev.x.toDouble() - 10, ev.y.toDouble() - 10)
+            val boxTo = ScreenCoordinate(ev.x.toDouble() + 10, ev.y.toDouble() + 10)
+            mapboxMap.queryRenderedFeatures(
+                RenderedQueryGeometry(ScreenBox(boxFrom, boxTo)), RenderedQueryOptions(
+                    listOf("osm-issues"), Value.valueOf("")
+                )
+            ) {
+                println(it.value)
+                println(it.value?.size)
+            }
+            view.performClick()
+            false
+        }
     }
+
     private fun initLocationComponent() {
         val locationComponentPlugin = mapView.location
         locationComponentPlugin.updateSettings {
@@ -133,8 +156,12 @@ class SecondFragment : Fragment() {
             )
             this.pulsingEnabled = true
         }
-        locationComponentPlugin.addOnIndicatorPositionChangedListener(onIndicatorPositionChangedListener)
-        locationComponentPlugin.addOnIndicatorBearingChangedListener(onIndicatorBearingChangedListener)
+        locationComponentPlugin.addOnIndicatorPositionChangedListener(
+            onIndicatorPositionChangedListener
+        )
+        locationComponentPlugin.addOnIndicatorBearingChangedListener(
+            onIndicatorBearingChangedListener
+        )
     }
 
     private fun setupGesturesListener() {
@@ -151,7 +178,7 @@ class SecondFragment : Fragment() {
         mapView.location.addOnIndicatorPositionChangedListener(onIndicatorPositionChangedListener)
         mapView.location.addOnIndicatorBearingChangedListener(onIndicatorBearingChangedListener)
         mapView.gestures.addOnMoveListener(onMoveListener)
-        if (point!=null) {
+        if (point != null) {
             mapView.getMapboxMap().setCamera(CameraOptions.Builder().center(point).build())
         }
         fab.hide()
