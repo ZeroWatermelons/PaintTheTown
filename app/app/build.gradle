@@ -49,4 +49,10 @@ dependencies {
     androidTestImplementation 'androidx.test.ext:junit:1.1.4'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.0'
     implementation "com.gorisse.thomas.sceneform:sceneform:1.21.0"
+    implementation 'com.github.slaviboy:VoronoiKotlin:v0.3.0'
+    implementation 'com.github.slaviboy:GraphicsKotlin:0.1.0'
+    implementation 'com.github.slaviboy:DelaunatorKotlin:0.2.0'
+    implementation "de.grundid.opendatalab:geojson-jackson:1.14"
+
+
 }

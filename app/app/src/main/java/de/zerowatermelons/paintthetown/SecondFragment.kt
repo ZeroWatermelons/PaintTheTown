@@ -1,49 +1,66 @@
 package de.zerowatermelons.paintthetown
 
+import android.graphics.Color
 import android.os.Bundle
-import androidx.fragment.app.Fragment
+import android.os.Handler
+import android.os.Looper
 import android.view.LayoutInflater
-import android.view.MotionEvent
 import android.view.View
-import android.view.View.OnTouchListener
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.appcompat.content.res.AppCompatResources
-import androidx.core.view.get
+import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
 import com.google.android.material.floatingactionbutton.FloatingActionButton
+import com.google.gson.JsonObject
 import com.mapbox.android.gestures.MoveGestureDetector
 import com.mapbox.bindgen.Value
-import com.mapbox.geojson.Geometry
+import com.mapbox.geojson.Feature
+import com.mapbox.geojson.FeatureCollection
 import com.mapbox.geojson.Point
+import com.mapbox.geojson.Polygon
 import com.mapbox.maps.*
+import com.mapbox.maps.extension.style.expressions.dsl.generated.get
 import com.mapbox.maps.extension.style.expressions.dsl.generated.interpolate
+import com.mapbox.maps.extension.style.layers.generated.fillLayer
+import com.mapbox.maps.extension.style.sources.generated.geoJsonSource
+import com.mapbox.maps.extension.style.style
 import com.mapbox.maps.plugin.LocationPuck2D
+import com.mapbox.maps.plugin.gestures.OnMapClickListener
 import com.mapbox.maps.plugin.gestures.OnMoveListener
-import com.mapbox.maps.plugin.gestures.addOnMapClickListener
 import com.mapbox.maps.plugin.gestures.gestures
 import com.mapbox.maps.plugin.locationcomponent.OnIndicatorBearingChangedListener
 import com.mapbox.maps.plugin.locationcomponent.OnIndicatorPositionChangedListener
 import com.mapbox.maps.plugin.locationcomponent.location
-import com.mapbox.maps.plugin.viewport.state.ViewportState
-import com.mapbox.maps.plugin.viewport.viewport
+import com.slaviboy.graphics.PointD
+import com.slaviboy.voronoi.Delaunay
+import com.slaviboy.voronoi.Voronoi
 import de.zerowatermelons.paintthetown.databinding.FragmentSecondBinding
 import java.lang.ref.WeakReference
-import java.util.Random
+import kotlin.random.Random
 
+const val OSM_ID = "osm_id"
+const val OSM_ISSUES = "osm-issues"
+const val STYLE = "mapbox://styles/fabiannowak/clanul8lp005d14o33kq78sg5/draft"
 /**
  * A simple [Fragment] subclass as the second destination in the navigation.
  */
-const val OSM_ID = "osm_id"
 class SecondFragment : Fragment() {
 
     private lateinit var locationPermissionHelper: LocationPermissionHelper
 
     private lateinit var mapView: MapView
     private lateinit var fab: FloatingActionButton
+    private lateinit var voronoiManager: VoronoiManager
 
     private var trackPosition: Boolean = true
     private var point: Point? = null
+
+    private var _binding: FragmentSecondBinding? = null
+
+    // This property is only valid between onCreateView and
+    // onDestroyView.
+    private val binding get() = _binding!!
 
     private val onIndicatorBearingChangedListener = OnIndicatorBearingChangedListener {
         if (trackPosition) {
@@ -62,20 +79,53 @@ class SecondFragment : Fragment() {
     private val onMoveListener = object : OnMoveListener {
         override fun onMoveBegin(detector: MoveGestureDetector) {
             onCameraTrackingDismissed()
+            voronoiManager.onMapViewportChanged()
         }
 
         override fun onMove(detector: MoveGestureDetector): Boolean {
+            voronoiManager.onMapViewportChanged()
             return false
         }
 
         override fun onMoveEnd(detector: MoveGestureDetector) {}
     }
 
-    private var _binding: FragmentSecondBinding? = null
+    private val onMapClickListener = OnMapClickListener { point ->
+        val mapboxMap = mapView.getMapboxMap()
+        val screenpoint = mapboxMap.pixelForCoordinate(point)
+        val boxFrom = ScreenCoordinate(screenpoint.x - 10, screenpoint.y - 10)
+        val boxTo = ScreenCoordinate(screenpoint.x + 10, screenpoint.y + 10)
+        mapboxMap.queryRenderedFeatures(
+            RenderedQueryGeometry(ScreenBox(boxFrom, boxTo)), RenderedQueryOptions(
+                listOf(OSM_ISSUES), Value.valueOf("")
+            )
+        ) {
+            val featureId = it.value?.getOrNull(0)?.feature?.getStringProperty("osm_id")
+            if (featureId != null) {
+                findNavController().navigate(
+                    R.id.action_SecondFragment_to_ArFragment,
+                    Bundle().apply {
+                        putString(OSM_ID, featureId)
+                    })
+            }
+        }
+        false
+    }
+    private val onVoronoiCalculated = { featureCollection:FeatureCollection ->
+        val mapboxMap = mapView.getMapboxMap()
+        mapboxMap.loadStyle(style(styleUri = STYLE) {
+            +geoJsonSource("voronoi") {
+                featureCollection(featureCollection)
+            }
+            +layerAtPosition(
+                fillLayer("voronoilayer", "voronoi") {
+                    fillOpacity(0.2)
+                    fillColor(get("color"))
+                }, above = "road-simple"
+            )
+        })
+    }
 
-    // This property is only valid between onCreateView and
-    // onDestroyView.
-    private val binding get() = _binding!!
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -112,35 +162,14 @@ class SecondFragment : Fragment() {
                 .build()
         )
         mapboxMap.loadStyleUri(
-            "mapbox://styles/fabiannowak/clanul8lp005d14o33kq78sg5/draft"
+            STYLE
         ) {
             initLocationComponent()
             setupGesturesListener()
         }
-        mapView.setOnTouchListener { view, ev ->
-            val boxFrom = ScreenCoordinate(ev.x.toDouble() - 10, ev.y.toDouble() - 10)
-            val boxTo = ScreenCoordinate(ev.x.toDouble() + 10, ev.y.toDouble() + 10)
-            mapboxMap.queryRenderedFeatures(
-                RenderedQueryGeometry(ScreenBox(boxFrom, boxTo)), RenderedQueryOptions(
-                    listOf("osm-issues"), Value.valueOf("")
-                )
-            ) {
-                val featureId = it.value?.let { list ->
-                    if(list.isNotEmpty()) {
-                        val feature = list[0]
-                        return@let feature.feature.getStringProperty("osm_id")
-                    }
-                    null
-                }
-                if (featureId !=null) {
-                    findNavController().navigate(R.id.action_SecondFragment_to_ArFragment, Bundle().apply {
-                        putString(OSM_ID, featureId)
-                    })
-                }
-            }
-            view.performClick()
-            false
-        }
+        voronoiManager = VoronoiManager()
+        voronoiManager.onJsonUpdated = onVoronoiCalculated
+        voronoiManager.onMapViewportChanged()
     }
 
     private fun initLocationComponent() {
@@ -177,6 +206,7 @@ class SecondFragment : Fragment() {
 
     private fun setupGesturesListener() {
         mapView.gestures.addOnMoveListener(onMoveListener)
+        mapView.gestures.addOnMapClickListener(onMapClickListener)
     }
 
     override fun onDestroyView() {
@@ -185,10 +215,8 @@ class SecondFragment : Fragment() {
     }
 
     private fun reenableCameraTracking() {
-
         mapView.location.addOnIndicatorPositionChangedListener(onIndicatorPositionChangedListener)
         mapView.location.addOnIndicatorBearingChangedListener(onIndicatorBearingChangedListener)
-        mapView.gestures.addOnMoveListener(onMoveListener)
         if (point != null) {
             mapView.getMapboxMap().setCamera(CameraOptions.Builder().center(point).build())
         }
@@ -201,7 +229,6 @@ class SecondFragment : Fragment() {
             .removeOnIndicatorPositionChangedListener(onIndicatorPositionChangedListener)
         mapView.location
             .removeOnIndicatorBearingChangedListener(onIndicatorBearingChangedListener)
-        mapView.gestures.removeOnMoveListener(onMoveListener)
         fab.show()
     }
 
@@ -212,5 +239,96 @@ class SecondFragment : Fragment() {
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         locationPermissionHelper.onRequestPermissionsResult(requestCode, permissions, grantResults)
+    }
+
+    inner class VoronoiManager {
+        val EXTEND_BOX = 1.5f
+        var voronoi: Voronoi? = null
+        var onJsonUpdated: ((FeatureCollection) -> Unit)? = null
+        private var runnable: Runnable? = null
+        private val handler = Handler(Looper.getMainLooper())
+
+        fun onMapViewportChanged() {
+            println("Viewport changed")
+            runnable?.let {
+                handler.removeCallbacks(it)
+            }
+            val runnable = Runnable {
+                scheduleUpdatePoints()
+                runnable = null
+            }
+            this.runnable = runnable
+            handler.postDelayed(runnable, 500)
+        }
+        fun scheduleUpdatePoints(){
+            val mapboxMap = mapView.getMapboxMap()
+            val screenSize = mapboxMap.getSize()
+            val screenCenter = ScreenCoordinate(
+                (screenSize.width/2).toDouble(),
+                (screenSize.height/2).toDouble()
+            )
+            val screenExtendedMin = ScreenCoordinate(screenCenter.x-screenCenter.x*EXTEND_BOX, screenCenter.y-screenCenter.y*EXTEND_BOX)
+            val screenExtendedMax = ScreenCoordinate(screenCenter.x+screenCenter.x*EXTEND_BOX, screenCenter.y+screenCenter.y*EXTEND_BOX)
+            println(screenExtendedMin)
+            println(screenExtendedMax)
+            mapboxMap.queryRenderedFeatures(RenderedQueryGeometry(ScreenBox(screenExtendedMin,screenExtendedMax)), RenderedQueryOptions(
+                listOf(OSM_ISSUES),Value.valueOf("")
+            )) { result ->
+                val list = result.value
+                if(list == null) {
+                    onJsonUpdated?.invoke(FeatureCollection.fromFeatures(emptyArray()))
+                    return@queryRenderedFeatures
+                }
+                println(list)
+                val points = list.mapNotNull {
+                    it.feature.geometry() as? Point
+                }.toList()
+                if (points.isEmpty()) {
+                    onJsonUpdated?.invoke(FeatureCollection.fromFeatures(emptyArray()))
+                    return@queryRenderedFeatures
+                }
+                val maxlatitude = points.maxOf { it.latitude() }
+                val maxlongitude = points.maxOf { it.longitude() }
+                val minlatitude = points.minOf { it.latitude() }
+                val minlongitude = points.minOf { it.longitude() }
+                val centerLat = (maxlatitude + minlatitude) / 2
+                val centerLong = (maxlongitude + minlongitude) / 2
+                val latspan = maxlatitude - minlatitude
+                val longspan = maxlongitude - minlongitude
+                val boundsLatMin = centerLat - (latspan / 2) * EXTEND_BOX
+                val boundsLatMax = centerLat + (latspan / 2) * EXTEND_BOX
+                val boundsLongMin = centerLong - (longspan / 2) * EXTEND_BOX
+                val boundsLongMax = centerLong + (longspan / 2) * EXTEND_BOX
+
+                voronoi =
+                    Delaunay.from(ArrayList(points.map { PointD(it.longitude(), it.latitude()) }))
+                        .voronoi(boundsLongMin, boundsLatMin, boundsLongMax, boundsLatMax)
+                getCells()
+                //TODO use actual color list (via db access etc)
+                onJsonUpdated?.invoke(geojsonCells(emptyList()))
+            }
+        }
+
+        fun getCells():ArrayList<ArrayList<Double>>{
+            return voronoi?.getCellsCoordinates()?: arrayListOf()
+        }
+
+        fun geojsonCells(colors: List<String>): FeatureCollection{
+            val cells = getCells()
+            val collection = FeatureCollection.fromFeatures(cells.mapIndexed { i, cell ->
+                val points = List(cell.size/2) {
+                    j -> Point.fromLngLat(cell[j*2],cell[j*2+1])
+                }
+                val geometry = Polygon.fromLngLats(listOf(points))
+                val feature = Feature.fromGeometry(geometry, JsonObject().apply {
+                    //TODO handle color list"
+                    val hexColor = String.format("#%06X", 0xFFFFFF and Color.rgb(Random.nextFloat(), Random.nextFloat(), Random.nextFloat()))
+                    addProperty("color", hexColor)
+                })
+                feature
+            }.toTypedArray())
+            println(collection.toJson())
+            return collection
+        }
     }
 }
