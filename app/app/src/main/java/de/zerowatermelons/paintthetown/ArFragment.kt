@@ -12,12 +12,15 @@ import com.google.ar.sceneform.AnchorNode
 import com.google.ar.sceneform.FrameTime
 import com.google.ar.sceneform.Node
 import com.google.ar.sceneform.SceneView
+import com.google.ar.sceneform.math.Quaternion
 import com.google.ar.sceneform.math.Vector3
 import com.google.ar.sceneform.rendering.*
 import com.google.ar.sceneform.ux.ArFragment
 import com.google.ar.sceneform.ux.TransformableNode
+import com.gorisse.thomas.sceneform.rotation
 import com.gorisse.thomas.sceneform.scene.await
 import kotlinx.coroutines.future.await
+import kotlin.random.Random
 
 class ArFragment : Fragment(R.layout.fragment_ar) {
 
@@ -25,10 +28,16 @@ class ArFragment : Fragment(R.layout.fragment_ar) {
     private val arSceneView get() = arFragment.arSceneView
     private val scene get() = arSceneView.scene
     private var session: Session? = null
-    private var anchor:Anchor? =null
+    private var anchor: Anchor? = null
 
     private var model: Renderable? = null
     private var modelView: ViewRenderable? = null
+
+    private var anchorNode: AnchorNode? = null
+
+    private var counter: Int = 0
+
+    private var pizza: BooleanArray = BooleanArray(12)
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
@@ -81,22 +90,21 @@ class ArFragment : Fragment(R.layout.fragment_ar) {
             })
         })
     }
-    fun onUpdate(frameTime : FrameTime) {
-        if(session==null) {
-            println("SESSION IST NULL!!!")
+
+    fun onUpdate(frameTime: FrameTime) {
+        if (session == null) {
             session = arSceneView.session
-            if(session==null) {
+            if (session == null) {
                 return
             }
         }
-        println("SESSION IST NICHT NULL!!!")
         val session = session!!
         val frame = session.update()
         println(frame.camera.trackingState)
-        if(frame.camera.trackingState==TrackingState.TRACKING && anchor==null) {
+        if (frame.camera.trackingState == TrackingState.TRACKING && anchor == null) {
             anchor =
                 session.createAnchor(Pose(floatArrayOf(0f, 0f, 0f), floatArrayOf(0f, 0f, 0f, 1f)))
-            scene.addChild(AnchorNode(anchor).apply {
+            anchorNode = AnchorNode(anchor).apply {
                 // Create the transformable model and add it to the anchor.
                 addChild(TransformableNode(arFragment.transformationSystem).apply {
                     renderable = model
@@ -106,8 +114,45 @@ class ArFragment : Fragment(R.layout.fragment_ar) {
                     localPosition = Vector3(0.0f, -10f, -10.0f)
                     localScale = Vector3(0.7f, 0.7f, 0.7f)
                 })
-            })
+            }
+            scene.addChild(anchorNode)
+        } else {
+            return
         }
 
+        //anchor's initialized from here on out
+
+
+        if (counter == 0) {
+            addChildSplat(Random.nextFloat() * 2 - 1, -1.8f, 5f - Random.nextFloat())
+            addChildSplat(Random.nextFloat() * 2 - 3, -1.8f, 5f + Random.nextFloat())
+            addChildSplat(Random.nextFloat() * 2 + 1, -1.8f, 5f + Random.nextFloat())
+
+            counter++
+        }
+
+        
+    }
+
+    fun addChildSplat(x: Float, y: Float, z: Float) {
+        // Create the transformable model and add it to the anchor.
+        anchorNode!!.addChild(TransformableNode(arFragment.transformationSystem).apply {
+            renderable = model
+            renderableInstance.setCulling(false)
+            renderableInstance.animate(true).start()
+
+            localPosition =
+                Vector3(Random.nextFloat() * 2 - 1, -1.8f, -(5f - Random.nextFloat()))
+            localScale = Vector3(0.1f, 0.1f, 0.1f)
+        })
+    }
+
+
+    fun convertQuaternionToYaw(quaternion: Quaternion): Float {
+        return kotlin.math.atan2(
+            2 * (quaternion.w * quaternion.z + quaternion.x * quaternion.y),
+            1 - 2 * (quaternion.y * quaternion.y + quaternion.z * quaternion.z)
+        )
     }
 }
+
