@@ -2,5 +2,5 @@
 
 developer-config.xml
 *.pbf
-*.qmd
 *.geojson
+*.qmd
