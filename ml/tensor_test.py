@@ -14,8 +14,6 @@ if __name__ == "__main__":
     train_images = train_images / 255.0
     test_images = test_images / 255.0
 
-
-
     model = tf.keras.Sequential([
         tf.keras.layers.Flatten(input_shape=(28, 28)),
         tf.keras.layers.Dense(128, activation='relu'),
