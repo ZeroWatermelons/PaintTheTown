@@ -7,9 +7,7 @@ import android.view.View
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
-import com.google.ar.core.HitResult
-import com.google.ar.core.Plane
-import com.google.ar.core.Pose
+import com.google.ar.core.*
 import com.google.ar.sceneform.AnchorNode
 import com.google.ar.sceneform.FrameTime
 import com.google.ar.sceneform.Node
@@ -26,6 +24,8 @@ class ArFragment : Fragment(R.layout.fragment_ar) {
     private lateinit var arFragment: ArFragment
     private val arSceneView get() = arFragment.arSceneView
     private val scene get() = arSceneView.scene
+    private var session: Session? = null
+    private var anchor:Anchor? =null
 
     private var model: Renderable? = null
     private var modelView: ViewRenderable? = null
@@ -39,33 +39,14 @@ class ArFragment : Fragment(R.layout.fragment_ar) {
             }
             setOnViewCreatedListener { arSceneView ->
                 arSceneView.setFrameRateFactor(SceneView.FrameRate.FULL)
-
+                arSceneView.scene.addOnUpdateListener(this@ArFragment::onUpdate)
             }
 
-            setOnTapArPlaneListener(::onTapPlane)
-            arFragment.arSceneView.scene.addOnUpdateListener(::onUpdate)
+            //setOnTapArPlaneListener(::onTapPlane)
         }
 
         lifecycleScope.launchWhenCreated {
             loadModels()
-            val session = arFragment.arSceneView.session
-            val anchor = session!!.createAnchor(Pose(floatArrayOf(0f,0f,0f),floatArrayOf(0f,0f,0f,1f)))
-            AnchorNode(anchor).apply {
-                // Create the transformable model and add it to the anchor.
-                addChild(TransformableNode(arFragment.transformationSystem).apply {
-                    renderable = model
-                    renderableInstance.setCulling(false)
-                    renderableInstance.animate(true).start()
-
-                    // Add the View
-                    addChild(Node().apply {
-                        // Define the relative position
-                        localPosition = Vector3(0.0f, 1f, 0.0f)
-                        localScale = Vector3(0.7f, 0.7f, 0.7f)
-                        renderable = modelView
-                    })
-                })
-            }
         }
     }
 
@@ -101,6 +82,32 @@ class ArFragment : Fragment(R.layout.fragment_ar) {
         })
     }
     fun onUpdate(frameTime : FrameTime) {
+        if(session==null) {
+            println("SESSION IST NULL!!!")
+            session = arSceneView.session
+            if(session==null) {
+                return
+            }
+        }
+        println("SESSION IST NICHT NULL!!!")
+        val session = session!!
+        val frame = session.update()
+        println(frame.camera.trackingState)
+        if(frame.camera.trackingState==TrackingState.TRACKING && anchor==null) {
+            anchor =
+                session.createAnchor(Pose(floatArrayOf(0f, 0f, 0f), floatArrayOf(0f, 0f, 0f, 1f)))
+            scene.addChild(AnchorNode(anchor).apply {
+                // Create the transformable model and add it to the anchor.
+                addChild(TransformableNode(arFragment.transformationSystem).apply {
+                    renderable = model
+                    renderableInstance.setCulling(false)
+                    renderableInstance.animate(true).start()
+
+                    localPosition = Vector3(0.0f, -10f, -10.0f)
+                    localScale = Vector3(0.7f, 0.7f, 0.7f)
+                })
+            })
+        }
 
     }
 }
