@@ -34,6 +34,7 @@ import java.util.Random
 /**
  * A simple [Fragment] subclass as the second destination in the navigation.
  */
+const val OSM_ID = "osm_id"
 class SecondFragment : Fragment() {
 
     private lateinit var locationPermissionHelper: LocationPermissionHelper
@@ -124,8 +125,18 @@ class SecondFragment : Fragment() {
                     listOf("osm-issues"), Value.valueOf("")
                 )
             ) {
-                println(it.value)
-                println(it.value?.size)
+                val featureId = it.value?.let { list ->
+                    if(list.isNotEmpty()) {
+                        val feature = list[0]
+                        return@let feature.feature.getStringProperty("osm_id")
+                    }
+                    null
+                }
+                if (featureId !=null) {
+                    findNavController().navigate(R.id.action_SecondFragment_to_ArFragment, Bundle().apply {
+                        putString(OSM_ID, featureId)
+                    })
+                }
             }
             view.performClick()
             false
