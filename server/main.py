@@ -124,6 +124,8 @@ def stats():
 def upload():
     db = get_db()
     getuser(db)
+    l = []
+    git
 
 
 
