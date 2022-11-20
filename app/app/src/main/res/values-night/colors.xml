@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="red_adaptive">#D8233F</color>
+    <color name="blue_adaptive">#15A8E3</color>
+    <color name="yellow_adaptive">#E8C624</color>
+    <color name="teamselectbutton_textcolor">#000000</color>
+</resources>

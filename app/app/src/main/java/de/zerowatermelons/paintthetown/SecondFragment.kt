@@ -5,13 +5,12 @@ import android.os.AsyncTask
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.view.LayoutInflater
-import android.view.View
-import android.view.ViewGroup
+import android.view.*
 import android.widget.Toast
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
+import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.gson.JsonObject
 import com.mapbox.android.gestures.MoveGestureDetector
@@ -62,6 +61,7 @@ class SecondFragment : Fragment() {
     private lateinit var fab: FloatingActionButton
     private lateinit var voronoiManager: VoronoiManager
     private lateinit var apiAccess: IApiAccess
+    private lateinit var team: Team
 
     private var trackPosition: Boolean = true
     private var point: Point? = null
@@ -128,6 +128,10 @@ class SecondFragment : Fragment() {
         Unit
     }
 
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setHasOptionsMenu(false)
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -141,6 +145,15 @@ class SecondFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        team = arguments?.getSerializable("selectedTeam") as Team
+        val toolbar = view.findViewById<MaterialToolbar>(R.id.toolbar)
+        val teamName = when(team){
+            Team.RED -> "Red"
+            Team.YELLOW -> "Yellow"
+            Team.BLUE -> "Blue"
+        }
+        toolbar.title = "You are in team $teamName!"
+        (requireActivity() as MainActivity).setSupportActionBar(toolbar)
         fab = view.findViewById(R.id.fab)
         fab.hide()
         fab.setOnClickListener {
@@ -223,6 +236,7 @@ class SecondFragment : Fragment() {
         super.onDestroyView()
         _binding = null
     }
+
 
     private fun reenableCameraTracking() {
         mapView.location.addOnIndicatorPositionChangedListener(onIndicatorPositionChangedListener)

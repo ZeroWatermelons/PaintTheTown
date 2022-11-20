@@ -2,4 +2,8 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <color name="red_adaptive">#C40233</color>
+    <color name="blue_adaptive">#0087BD</color>
+    <color name="yellow_adaptive">#FFD300</color>
+    <color name="teamselectbutton_textcolor">#FFFFFF</color>
 </resources>
