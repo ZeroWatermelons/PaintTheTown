@@ -1,0 +1,6 @@
+/build
+
+developer-config.xml
+*.pbf
+*.geojson
+*.qmd
