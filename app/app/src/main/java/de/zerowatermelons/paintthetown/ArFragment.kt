@@ -23,6 +23,8 @@ import com.google.ar.sceneform.ux.TransformableNode
 import com.gorisse.thomas.sceneform.rotation
 import com.gorisse.thomas.sceneform.scene.await
 import kotlinx.coroutines.future.await
+import kotlin.math.asin
+import kotlin.math.floor
 import kotlin.random.Random
 
 const val STATUS = "winStatus"
@@ -43,12 +45,12 @@ class ArFragment : Fragment(R.layout.fragment_ar) {
 
     private var anchorNode: AnchorNode? = null
 
-    private var SECTIONS = 16
+    private var SECTIONS = 32
     private var SECTION_SIZE = 2*kotlin.math.PI / SECTIONS
     private var pizza: BooleanArray = BooleanArray(SECTIONS)
     private var lastSlice: Int = -1
 
-    private var n: TransformableNode? = null
+    private var n: Node? = null
 
     inner class Bullet(var speed: Vector3) {
 
@@ -64,27 +66,25 @@ class ArFragment : Fragment(R.layout.fragment_ar) {
 
         }
 
-        lateinit var node : TransformableNode
+        lateinit var node : Node
         var done : Boolean = false
 
         init {
-            this.node = TransformableNode(arFragment.transformationSystem).apply {
+            this.node = Node().apply {
                 renderable = sModel
                 renderableInstance.setCulling(false)
-                renderableInstance.animate(true).start()
 
                 val len = kotlin.math.sqrt(speed.x * speed.x + speed.z * speed.z)
                 var nx = speed.x / len
                 var nz = speed.z / len
 
                 localPosition = Vector3(nx, 0.0f , nz)
-                scaleController.minScale=0.001f
-                scaleController.maxScale=999f
+//                scaleController.minScale=0.001f
+//                scaleController.maxScale=999f
                 var randomFloat: Float = Random.nextFloat() * 0.4f;
                 localScale = Vector3(randomFloat, randomFloat,  randomFloat)
             }
             anchorNode!!.addChild(node)
-            this.node.select()
             var mis = node.renderableInstance.filamentAsset!!.materialInstances
             var ts = TextureSampler()
             for (mi in mis) {
@@ -137,10 +137,9 @@ class ArFragment : Fragment(R.layout.fragment_ar) {
         // Create the Anchor.
         scene.addChild(AnchorNode(hitResult.createAnchor()).apply {
             // Create the transformable model and add it to the anchor.
-            addChild(TransformableNode(arFragment.transformationSystem).apply {
+            addChild(Node().apply {
                 renderable = model
                 renderableInstance.setCulling(false)
-                renderableInstance.animate(true).start()
 
                 // Add the View
                 addChild(Node().apply {
@@ -169,10 +168,9 @@ private var cnt : Int = 0
                 session.createAnchor(Pose(floatArrayOf(0f, 0f, 0f), floatArrayOf(0f, 0f, 0f, 1f)))
             anchorNode = AnchorNode(anchor).apply {
                 // Create the transformable model and add it to the anchor.
-                addChild(TransformableNode(arFragment.transformationSystem).apply {
+                addChild(Node().apply {
                     renderable = model
                     renderableInstance.setCulling(false)
-                    renderableInstance.animate(true).start()
 
                     localPosition = Vector3(0.0f, -10f, -10.0f)
                     localScale = Vector3(0.7f, 0.7f, 0.7f)
@@ -185,8 +183,8 @@ private var cnt : Int = 0
         //anchor's initialized from here on out
 
 
-        val rot = convertQuaternionToYaw(frame.camera.displayOrientedPose.rotation) + Math.PI;
-        var index = (rot / SECTION_SIZE).toInt()
+        val rot = convertQuaternionToYaw(frame.camera.displayOrientedPose.rotation)
+        var index = Math.floorMod(floor(rot / SECTION_SIZE).toInt(), SECTIONS)
         println("DDDD index: " + index + ",  rot: " + rot)
         if (index < 0)
             index = 0
@@ -236,26 +234,9 @@ private var cnt : Int = 0
         }
 
 
-        // BULLSHIT
-        if(cnt == 0){
-            n = TransformableNode(arFragment.transformationSystem).apply {
-                renderable = sModel
-                renderableInstance.animate(true).start()
 
-                localPosition= Vector3(0f,0f,0f)
-                scaleController.minScale=0.001f
-                scaleController.maxScale=999f
-                var randomFloat: Float = Random.nextFloat() * 0.4f;
-                localScale = Vector3(0.25f, 0.25f, 0.25f)
-            }
-            anchorNode!!.addChild(n)
-            cnt++
-        }
-
-        n?.select()
-        n?.localPosition = Vector3(translateX(0f, 1f, rot.toFloat()), 0.5f, translateZ(0f, 1f, rot.toFloat()))
-
-        println("EEEE" + n?.localPosition?.x + ", " + n?.localPosition?.z)
+        println("EEEE " + rot + ", "+ n?.localPosition?.x + ", " + n?.localPosition?.z)
+        println("KKKK " + pizza.contentToString())
 
         //check if finished
         finishCheck()
@@ -269,6 +250,7 @@ private var cnt : Int = 0
         //finish
         var b = Bundle()
         b.putBoolean(STATUS, true)
+        Toast.makeText(context, "Yay", Toast.LENGTH_SHORT)
         //findNavController().navigate(R.id.action_ArFragment_to_SecondFragment, b)
     }
 
@@ -278,9 +260,11 @@ private var cnt : Int = 0
         println("CCCC " + pizza.asList())
         pizza[index] = true;
         val rot = index * SECTION_SIZE + 0.5f * SECTION_SIZE
+        println("LLLL" + index + " "+ rot)
         val angle = rot.toFloat()
-        for(i in 1..15)
-            addChildSplatR(Random.nextDouble(-4.0, 4.0).toFloat(), -1.8f, Random.nextDouble(1.0, 7.0).toFloat(), angle)
+        for(i in 1..10)
+            addChildSplatR(0f, -1.8f, -Random.nextDouble(1.0, 7.0).toFloat(),
+                angle + (Random.nextFloat() - 0.5f)*SECTION_SIZE.toFloat())
     }
 
     fun addChildSplatR(x: Float, y: Float, z: Float, angle: Float){
@@ -290,11 +274,11 @@ private var cnt : Int = 0
     }
 
     fun translateX(x: Float, z: Float, angle: Float) : Float{
-        return x * kotlin.math.cos(angle) + z * -kotlin.math.sin(angle)
+        return x * kotlin.math.cos(angle) + z * kotlin.math.sin(angle)
     }
 
     fun translateZ(x: Float, z: Float, angle: Float) : Float{
-        return x * kotlin.math.sin(angle) + z * kotlin.math.cos(angle)
+        return x * -kotlin.math.sin(angle) + z * kotlin.math.cos(angle)
     }
 
     fun addChildSplat(x: Float, y: Float, z: Float) {
@@ -307,18 +291,17 @@ private var cnt : Int = 0
 
     fun genSplatFromBullet(b: Bullet) {
         // Create the transformable model and add it to the anchor.
-        var c = TransformableNode(arFragment.transformationSystem).apply {
+        var c = Node().apply {
             renderable = model
             renderableInstance.setCulling(false)
             renderableInstance.animate(true).start()
 
             localPosition = b.node.localPosition
-            scaleController.minScale=0.001f
-            scaleController.maxScale=999f
+//            scaleController.minScale=0.001f
+//            scaleController.maxScale=999f
             localScale = Vector3(b.node.localScale.x * 5.0f, 1f, b.node.localScale.z * 5.0f)
         }
         anchorNode!!.addChild(c)
-        c.select()
         var mis = c.renderableInstance.filamentAsset!!.materialInstances
 
         var ts = TextureSampler()
@@ -329,12 +312,23 @@ private var cnt : Int = 0
 
     }
 
+    //von wikipedia, aber y und z vertauscht, da bei uns z nach oben geht
 
+    fun convertQuaternionToRoll(quaternion: Quaternion): Float {
+        return kotlin.math.atan2(
+            2 * (quaternion.w * quaternion.z + quaternion.x * quaternion.y),
+            1 - 2 * (quaternion.x * quaternion.x + quaternion.z * quaternion.z)
+        )
+    }
+
+    fun convertQuaternionToPitch(quaternion: Quaternion): Float {
+        return asin(2 * (quaternion.w * quaternion.x - quaternion.y * quaternion.z))
+    }
 
     fun convertQuaternionToYaw(quaternion: Quaternion): Float {
         return kotlin.math.atan2(
-            2 * (quaternion.w * quaternion.z + quaternion.x * quaternion.y),
-            1 - 2 * (quaternion.y * quaternion.y + quaternion.z * quaternion.z)
+            2 * (quaternion.w * quaternion.y + quaternion.z * quaternion.x),
+            1 - 2 * (quaternion.x * quaternion.x + quaternion.y * quaternion.y)
         )
     }
 }
