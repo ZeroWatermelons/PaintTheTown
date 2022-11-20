@@ -1,35 +1,28 @@
 package de.zerowatermelons.paintthetown
 
 import android.content.res.AssetManager
-import android.graphics.Color
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.google.gson.JsonArray
-import com.google.gson.JsonObject
-import org.geojson.FeatureCollection
-import org.geojson.GeoJsonObject
-import org.geojson.Point
 import kotlin.random.Random
 
 class ApiAccessMock(assetManager: AssetManager) : IApiAccess {
     companion object {
-        private var splashzones: MutableList<IApiAccess.Splashzone>?= null
+        private var splatzones: MutableList<IApiAccess.Splatzone>?= null
     }
 
     init {
-        if(splashzones == null) {
+        if(splatzones == null) {
             val splashzones = ObjectMapper().readValue(
                 assetManager.open("mock-splatmap.json"),
-                JsonNode::class.java
-            )
-            ApiAccessMock.splashzones = splashzones.asSequence().mapIndexedNotNull { i, it ->
+                JsonNode::class.java)
+            ApiAccessMock.splatzones = splashzones.asSequence().mapIndexedNotNull { i, it ->
                 val team = Team.values()[Random.nextInt(Team.values().size)]
                 val long = it.get("long").asDouble()
                 val lat = it.get("lat").asDouble()
                 val osmid = it.get("osmid").asText()
-                IApiAccess.Splashzone(
+                IApiAccess.Splatzone(
                     i.toLong(),
-                    team,
+                    IApiAccess.User(i.toLong(), "jören", IApiAccess.Team(0, team)),
                     long,
                     lat,
                     osmid,
@@ -38,25 +31,47 @@ class ApiAccessMock(assetManager: AssetManager) : IApiAccess {
         }
     }
 
-    override fun getSplashzones(
+    override fun getSplatzones(
         long: Double,
         lat: Double,
         radius: Double,
-        callback: (List<IApiAccess.Splashzone>) -> Unit
+        callback: (List<IApiAccess.Splatzone>) -> Unit
     ) {
-        callback(splashzones!!)
+        callback(splatzones!!)
     }
 
-    override fun assignSplashzone(osmid: String, team: Team, callback: () -> Unit) {
-        val idx = splashzones!!.indexOfFirst { it.osmid == osmid }
-        val splashzoneData = splashzones!![idx]
-        splashzones!![idx] = IApiAccess.Splashzone(
+    override fun assignSplashzone(osmid: String, user: IApiAccess.User, callback: () -> Unit) {
+        val idx = splatzones!!.indexOfFirst { it.osmid == osmid }
+        val splashzoneData = splatzones!![idx]
+        splatzones!![idx] = IApiAccess.Splatzone(
             splashzoneData.id,
-            team,
+            user,
             splashzoneData.long,
             splashzoneData.lat,
             splashzoneData.osmid
         )
         callback()
     }
+
+    override fun uploadImageData(
+        userID: Long,
+        zoneID: Long,
+        width: Int,
+        height: Int,
+        type: String,
+        data64: String
+    ) {
+        //EMPTY
+    }
+
+    override fun getTeams() : Array<IApiAccess.Team>{
+        return arrayOf()
+    }
+    override fun getUsers() : Array<IApiAccess.User>{
+        return arrayOf()
+    }
+    override fun getUser(name: String) : IApiAccess.User{
+        return IApiAccess.User(0, "jören", IApiAccess.Team(0, Team.BLUE))
+    }
+
 }

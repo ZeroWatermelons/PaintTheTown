@@ -123,9 +123,11 @@ def stats():
 @app.route('/api/upload', methods=['POST'])
 def upload():
     db = get_db()
-    getuser(db)
-    l = []
-    git
+    uID = request.data.find("userID")
+    zID = request.data.find("zoneID")
+    c = db.cursor()
+    c.execute("UPDATE splatzones SET owner_id = ? WHERE id = ?", (uID, zID, ))
+    # todo send image to ML model
 
 
 
