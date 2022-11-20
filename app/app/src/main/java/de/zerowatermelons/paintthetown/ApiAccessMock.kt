@@ -4,29 +4,24 @@ import android.content.res.AssetManager
 import android.graphics.Color
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.google.gson.JsonArray
-import com.google.gson.JsonObject
-import org.geojson.FeatureCollection
-import org.geojson.GeoJsonObject
-import org.geojson.Point
 import kotlin.random.Random
 
 class ApiAccessMock(assetManager: AssetManager) : IApiAccess {
-    private val splashzones: List<IApiAccess.Splashzone>
+    private val splashzones: List<IApiAccess.Splatzone>
 
     init {
-        val splashzones = ObjectMapper().readValue(
+        val splatzones = ObjectMapper().readValue(
             assetManager.open("mock-splatmap.json"),
             JsonNode::class.java
         )
-        this.splashzones = splashzones.asSequence().mapIndexedNotNull { i, it ->
+        this.splashzones = splatzones.asSequence().mapIndexedNotNull { i, it ->
             val hexColor = String.format("#%06X", 0xFFFFFF and Color.rgb(Random.nextFloat(), Random.nextFloat(), Random.nextFloat()))
             val long = it.get("long").asDouble()
             val lat = it.get("lat").asDouble()
-            val osmid = it.get("osmid").asText()
-            IApiAccess.Splashzone(
+            val osmid = it.get("osmid").asLong()
+            IApiAccess.Splatzone(
                 i.toLong(),
-                hexColor,
+                IApiAccess.User(0, "jören", IApiAccess.Team(0, "#330000")),
                 long,
                 lat,
                 osmid,
@@ -34,12 +29,29 @@ class ApiAccessMock(assetManager: AssetManager) : IApiAccess {
         }.toList()
     }
 
-    override fun getSplashzones(
-        long: Double,
-        lat: Double,
-        radius: Double,
-        callback: (List<IApiAccess.Splashzone>) -> Unit
-    ) {
+    override fun getSplatzones(long: Double, lat: Double, radius: Double, callback: (List<IApiAccess.Splatzone>) -> Unit){
         callback(splashzones)
     }
+
+    override fun uploadImageData(
+        userID: Long,
+        zoneID: Long,
+        width: Int,
+        height: Int,
+        type: String,
+        data64: String
+    ) {
+        //EMPTY
+    }
+
+    override fun getTeams() : Array<IApiAccess.Team>{
+        return arrayOf()
+    }
+    override fun getUsers() : Array<IApiAccess.User>{
+        return arrayOf()
+    }
+    override fun getUser(name: String) : IApiAccess.User{
+        return IApiAccess.User(0, "jören", IApiAccess.Team(0, "#330000"))
+    }
+
 }

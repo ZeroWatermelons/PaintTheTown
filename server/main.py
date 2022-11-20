@@ -122,6 +122,7 @@ def stats():
 # Example post {data=[img1, img2, ...]}
 @app.route('/api/upload', methods=['POST'])
 def upload():
+
     db = get_db()
     getuser(db)
     l = []
