@@ -21,11 +21,15 @@ class ApiAccess: IApiAccess {
     }
 
     private fun teamFromJson(tjs: JSONObject) : IApiAccess.Team{
-        return IApiAccess.Team(tjs.getLong("id"), tjs.getString("color"))
+        return IApiAccess.Team(tjs.getLong("id"), Team.valueOf(tjs.getString("color")))
     }
 
     private fun userFromJson(ujs: JSONObject) : IApiAccess.User{
         return IApiAccess.User(ujs.getLong("id"), ujs.getString("name"), teamFromJson(ujs.getJSONObject("team")))
+    }
+
+    override fun assignSplashzone(osmid: String, user: IApiAccess.User, callback: () -> Unit) {
+        TODO("Not yet implemented")
     }
 
     override fun getTeams(): Array<IApiAccess.Team> {
@@ -61,7 +65,7 @@ class ApiAccess: IApiAccess {
         for (i in 0 until arr!!.length()){
             //return {'id': zone[0], 'owner': user, 'long': zone[2], 'lat': zone[3], 'osmid': zone[4]}
             val o = arr.getJSONObject(i)
-            zones.add(IApiAccess.Splatzone(o.getLong("id"), userFromJson(o.getJSONObject("owner")), o.getDouble("long"), o.getDouble("lat"), o.getLong("osmid")))
+            zones.add(IApiAccess.Splatzone(o.getLong("id"), userFromJson(o.getJSONObject("owner")), o.getDouble("long"), o.getDouble("lat"), o.getString("osmid")))
         }
 
         callback(zones)
@@ -79,10 +83,5 @@ class ApiAccess: IApiAccess {
         val req = Request.Builder().url("$BASE/upload").post(o.toString().toRequestBody()).build()
         client.newCall(req).execute()
     }
-
-    override fun assignSplashzone(osmid: String, team: Team, callback: () -> Unit) {
-        TODO("Not yet implemented")
-    }
-
 
 }
