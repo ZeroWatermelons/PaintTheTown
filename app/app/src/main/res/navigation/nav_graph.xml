@@ -34,7 +34,10 @@
     <fragment
         android:id="@+id/ArFragment"
         android:name="de.zerowatermelons.paintthetown.ArFragment"
-        android:label="@string/second_fragment_label"
+        android:label="@string/ar_fragment_label"
         tools:layout="@layout/fragment_ar">
+
+        <action android:id="@+id/action_ArFragment_to_SecondFragment"
+            app:destination="@id/SecondFragment" />
     </fragment>
 </navigation>
