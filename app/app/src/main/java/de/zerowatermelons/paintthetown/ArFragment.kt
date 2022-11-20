@@ -8,6 +8,7 @@ import android.widget.SectionIndexer
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import androidx.navigation.fragment.findNavController
 import com.google.android.filament.TextureSampler
 import com.google.ar.core.*
 import com.google.ar.sceneform.AnchorNode
@@ -24,7 +25,11 @@ import com.gorisse.thomas.sceneform.scene.await
 import kotlinx.coroutines.future.await
 import kotlin.random.Random
 
+const val STATUS = "winStatus"
+
 class ArFragment : Fragment(R.layout.fragment_ar) {
+
+
 
     private lateinit var arFragment: ArFragment
     private val arSceneView get() = arFragment.arSceneView
@@ -38,12 +43,12 @@ class ArFragment : Fragment(R.layout.fragment_ar) {
 
     private var anchorNode: AnchorNode? = null
 
-    private var counter: Int = 0
-
     private var SECTIONS = 16
     private var SECTION_SIZE = 2*kotlin.math.PI / SECTIONS
     private var pizza: BooleanArray = BooleanArray(SECTIONS)
     private var lastSlice: Int = -1
+
+    private var n: TransformableNode? = null
 
     inner class Bullet(var speed: Vector3) {
 
@@ -68,9 +73,11 @@ class ArFragment : Fragment(R.layout.fragment_ar) {
                 renderableInstance.setCulling(false)
                 renderableInstance.animate(true).start()
 
+                val len = kotlin.math.sqrt(speed.x * speed.x + speed.z * speed.z)
+                var nx = speed.x / len
+                var nz = speed.z / len
 
-
-                localPosition = Vector3(0.0f, 0.0f , 0.0f)
+                localPosition = Vector3(nx, 0.0f , nz)
                 scaleController.minScale=0.001f
                 scaleController.maxScale=999f
                 var randomFloat: Float = Random.nextFloat() * 0.4f;
@@ -145,13 +152,14 @@ class ArFragment : Fragment(R.layout.fragment_ar) {
             })
         })
     }
-
+private var cnt : Int = 0
     fun onUpdate(frameTime: FrameTime) {
         if (session == null) {
             session = arSceneView.session
             if (session == null) {
                 return
             }
+
         }
         val session = session!!
         val frame = session.update()
@@ -179,28 +187,38 @@ class ArFragment : Fragment(R.layout.fragment_ar) {
 
         val rot = convertQuaternionToYaw(frame.camera.displayOrientedPose.rotation) + Math.PI;
         var index = (rot / SECTION_SIZE).toInt()
+        println("DDDD index: " + index + ",  rot: " + rot)
         if (index < 0)
             index = 0
         if (index >= SECTIONS)
             index = SECTIONS-1
 
         if(lastSlice == -1)
-            lastSlice = SECTIONS - 1
+            lastSlice = index
+
+        fireShotForRotation(index)
 
         val r1 = (SECTIONS - kotlin.math.max(index, lastSlice)) + kotlin.math.min(index, lastSlice)
         val r2 = kotlin.math.max(index, lastSlice) - kotlin.math.min(index, lastSlice)
+        var dsum = 0;
         if(r1 < r2){
             for( i in  kotlin.math.max(index, lastSlice)  until SECTIONS){
                 fireShotForRotation(i)
+                dsum++
             }
             for(i in 0.. kotlin.math.min(index, lastSlice)){
                 fireShotForRotation(i)
+                dsum++
             }
         }else{
             for(i in kotlin.math.min(index, lastSlice)..kotlin.math.max(index, lastSlice)){
                 fireShotForRotation(i)
+                dsum++
             }
         }
+
+
+
 
         lastSlice = index
 
@@ -217,16 +235,52 @@ class ArFragment : Fragment(R.layout.fragment_ar) {
             }
         }
 
+
+        // BULLSHIT
+        if(cnt == 0){
+            n = TransformableNode(arFragment.transformationSystem).apply {
+                renderable = sModel
+                renderableInstance.animate(true).start()
+
+                localPosition= Vector3(0f,0f,0f)
+                scaleController.minScale=0.001f
+                scaleController.maxScale=999f
+                var randomFloat: Float = Random.nextFloat() * 0.4f;
+                localScale = Vector3(0.25f, 0.25f, 0.25f)
+            }
+            anchorNode!!.addChild(n)
+            cnt++
+        }
+
+        n?.select()
+        n?.localPosition = Vector3(translateX(0f, 1f, rot.toFloat()), 0.5f, translateZ(0f, 1f, rot.toFloat()))
+
+        println("EEEE" + n?.localPosition?.x + ", " + n?.localPosition?.z)
+
+        //check if finished
+        finishCheck()
+    }
+
+    fun finishCheck(){
+        for (slice in pizza) {
+            if(!slice)
+                return
+        }
+        //finish
+        var b = Bundle()
+        b.putBoolean(STATUS, true)
+        //findNavController().navigate(R.id.action_ArFragment_to_SecondFragment, b)
     }
 
     fun fireShotForRotation(index: Int){
-        if(!pizza[index])
+        if(pizza[index])
             return
+        println("CCCC " + pizza.asList())
         pizza[index] = true;
         val rot = index * SECTION_SIZE + 0.5f * SECTION_SIZE
         val angle = rot.toFloat()
         for(i in 1..15)
-            addChildSplatR(Random.nextDouble(-5.0, 5.0).toFloat(), -1.8f, Random.nextDouble(1.0, 7.0).toFloat(), angle)
+            addChildSplatR(Random.nextDouble(-4.0, 4.0).toFloat(), -1.8f, Random.nextDouble(1.0, 7.0).toFloat(), angle)
     }
 
     fun addChildSplatR(x: Float, y: Float, z: Float, angle: Float){
