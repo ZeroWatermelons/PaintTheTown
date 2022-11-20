@@ -15,6 +15,7 @@ import androidx.navigation.fragment.findNavController
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.gson.JsonObject
 import com.mapbox.android.gestures.MoveGestureDetector
+import com.mapbox.android.gestures.StandardScaleGestureDetector
 import com.mapbox.bindgen.Value
 import com.mapbox.geojson.Feature
 import com.mapbox.geojson.FeatureCollection
@@ -35,6 +36,7 @@ import com.mapbox.maps.plugin.LocationPuck2D
 import com.mapbox.maps.plugin.LocationPuck3D
 import com.mapbox.maps.plugin.gestures.OnMapClickListener
 import com.mapbox.maps.plugin.gestures.OnMoveListener
+import com.mapbox.maps.plugin.gestures.OnScaleListener
 import com.mapbox.maps.plugin.gestures.gestures
 import com.mapbox.maps.plugin.locationcomponent.OnIndicatorBearingChangedListener
 import com.mapbox.maps.plugin.locationcomponent.OnIndicatorPositionChangedListener
@@ -47,6 +49,7 @@ import java.lang.ref.WeakReference
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 import kotlin.concurrent.thread
+import kotlin.math.pow
 import kotlin.random.Random
 
 const val OSM_ID = "osm_id"
@@ -215,10 +218,39 @@ class SecondFragment : Fragment() {
             onIndicatorBearingChangedListener
         )
     }
+    private inner class ScaleListener : OnScaleListener{
+        /**
+         * Called when the scale gesture is starting.
+         */
+        override fun onScaleBegin(detector: StandardScaleGestureDetector){}
+
+        /**
+         * Called when the scale gesture is executing.
+         */
+        override fun onScale(detector: StandardScaleGestureDetector){
+            val zoom = kotlin.math.max(mapView.getMapboxMap().cameraState.zoom + 1, 7.0)
+            println("miau 2 "+zoom)
+            val locationComponentPlugin = mapView.location
+            locationComponentPlugin.updateSettings {
+            this.enabled = true
+            this.locationPuck = LocationPuck3D(modelUri = "asset://models/blue.gltf",
+                modelScale = listOf((1.0f/5832.0f) * zoom.pow(3.0).toFloat(), (1.0f/5832.0f) * zoom.pow(3.0).toFloat(), (1.0f/5832.0f) * zoom.pow(3.0).toFloat())
+            )
+            this.pulsingEnabled = true
+        }
+        }
+
+        /**
+         * called when the scale gesture has ended.
+         */
+        override fun onScaleEnd(detector: StandardScaleGestureDetector){}
+
+    }
 
     private fun setupGesturesListener() {
         mapView.gestures.addOnMoveListener(onMoveListener)
         mapView.gestures.addOnMapClickListener(onMapClickListener)
+        mapView.gestures.addOnScaleListener(ScaleListener())
     }
 
     override fun onDestroyView() {
