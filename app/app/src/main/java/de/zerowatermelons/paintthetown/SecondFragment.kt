@@ -315,12 +315,12 @@ class SecondFragment : Fragment() {
 //                    onJsonUpdated?.invoke(FeatureCollection.fromFeatures(emptyArray()))
 //                    return@queryRenderedFeatures
 //                }
-            apiAccess.getSplashzones(0.0,0.0,0.0) { result ->
+            apiAccess.getSplatzones(0.0,0.0,0.0) { result ->
                 val points = result.map {
                     Point.fromLngLat(it.long,it.lat)
                 }
                 val colors = result.map {
-                    it.owner
+                    it.owner.team.color
                 }
                 val maxlatitude = points.maxOf { it.latitude() }
                 val maxlongitude = points.maxOf { it.longitude() }
