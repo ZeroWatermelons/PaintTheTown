@@ -50,6 +50,8 @@ import kotlin.random.Random
 const val OSM_ID = "osm_id"
 const val OSM_ISSUES = "osm-issues"
 const val STYLE = "mapbox://styles/fabiannowak/clanul8lp005d14o33kq78sg5/draft"
+const val TEAM = "team"
+
 /**
  * A simple [Fragment] subclass as the second destination in the navigation.
  */
@@ -116,12 +118,13 @@ class SecondFragment : Fragment() {
                     R.id.action_SecondFragment_to_ArFragment,
                     Bundle().apply {
                         putString(OSM_ID, featureId)
+                        putSerializable(TEAM, team)
                     })
             }
         }
         false
     }
-    private val onVoronoiCalculated = { featureCollection:FeatureCollection ->
+    private val onVoronoiCalculated = { featureCollection: FeatureCollection ->
         val mapboxMap = mapView.getMapboxMap()
         val geojsonsource = mapboxMap.getStyle()?.getSource("voronoi") as GeoJsonSource
         geojsonsource.featureCollection(featureCollection)
@@ -145,9 +148,11 @@ class SecondFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        team = arguments?.getSerializable("selectedTeam") as Team
+        team = arguments?.getSerializable("selectedTeam") as? Team ?: arguments?.getSerializable(
+            TEAM
+        ) as? Team ?: savedInstanceState?.getSerializable("team") as Team
         val toolbar = view.findViewById<MaterialToolbar>(R.id.toolbar)
-        val teamName = when(team){
+        val teamName = when (team) {
             Team.RED -> "Red"
             Team.YELLOW -> "Yellow"
             Team.BLUE -> "Blue"
@@ -232,6 +237,12 @@ class SecondFragment : Fragment() {
         mapView.gestures.addOnMapClickListener(onMapClickListener)
     }
 
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        println("XXXXX save")
+        outState.putSerializable("team", team)
+    }
+
     override fun onDestroyView() {
         super.onDestroyView()
         _binding = null
@@ -265,7 +276,7 @@ class SecondFragment : Fragment() {
     }
 
     inner class VoronoiManager {
-        inner class CancelDelayedRunnable(val afterDelay: () -> Unit): Runnable {
+        inner class CancelDelayedRunnable(val afterDelay: () -> Unit) : Runnable {
             private val obj = Object()
             private var cancelled: Boolean = false
             var running: Boolean = false
@@ -274,10 +285,11 @@ class SecondFragment : Fragment() {
                     obj.wait(500)
                 }
                 if (cancelled) return
-                running=true
+                running = true
                 afterDelay()
-                running=false
+                running = false
             }
+
             fun cancelWait() {
                 cancelled = true
                 synchronized(obj) {
@@ -285,6 +297,7 @@ class SecondFragment : Fragment() {
                 }
             }
         }
+
         val EXTEND_BOX = 1.5f
         var voronoi: Voronoi? = null
         var onJsonUpdated: ((FeatureCollection) -> Unit)? = null
@@ -301,13 +314,20 @@ class SecondFragment : Fragment() {
                 executor.execute(it)
             }
         }
-        fun scheduleUpdatePoints(screenSize: Size){
+
+        fun scheduleUpdatePoints(screenSize: Size) {
             val screenCenter = ScreenCoordinate(
-                (screenSize.width/2).toDouble(),
-                (screenSize.height/2).toDouble()
+                (screenSize.width / 2).toDouble(),
+                (screenSize.height / 2).toDouble()
             )
-            val screenExtendedMin = ScreenCoordinate(screenCenter.x-screenCenter.x*EXTEND_BOX, screenCenter.y-screenCenter.y*EXTEND_BOX)
-            val screenExtendedMax = ScreenCoordinate(screenCenter.x+screenCenter.x*EXTEND_BOX, screenCenter.y+screenCenter.y*EXTEND_BOX)
+            val screenExtendedMin = ScreenCoordinate(
+                screenCenter.x - screenCenter.x * EXTEND_BOX,
+                screenCenter.y - screenCenter.y * EXTEND_BOX
+            )
+            val screenExtendedMax = ScreenCoordinate(
+                screenCenter.x + screenCenter.x * EXTEND_BOX,
+                screenCenter.y + screenCenter.y * EXTEND_BOX
+            )
             println(screenExtendedMin)
             println(screenExtendedMax)
 
@@ -327,9 +347,9 @@ class SecondFragment : Fragment() {
 //                    onJsonUpdated?.invoke(FeatureCollection.fromFeatures(emptyArray()))
 //                    return@queryRenderedFeatures
 //                }
-            apiAccess.getSplashzones(0.0,0.0,0.0) { result ->
+            apiAccess.getSplashzones(0.0, 0.0, 0.0) { result ->
                 val points = result.map {
-                    Point.fromLngLat(it.long,it.lat)
+                    Point.fromLngLat(it.long, it.lat)
                 }
                 val colors = result.map {
                     it.owner
@@ -353,19 +373,19 @@ class SecondFragment : Fragment() {
                 getCells()
                 //TODO use actual color list (via db access etc)
                 val jsoncells = geojsonCells(colors)
-                Handler(Looper.getMainLooper()).post {onJsonUpdated?.invoke(jsoncells)}
+                Handler(Looper.getMainLooper()).post { onJsonUpdated?.invoke(jsoncells) }
             }
         }
 
-        fun getCells():ArrayList<ArrayList<Double>>{
-            return voronoi?.getCellsCoordinates()?: arrayListOf()
+        fun getCells(): ArrayList<ArrayList<Double>> {
+            return voronoi?.getCellsCoordinates() ?: arrayListOf()
         }
 
-        fun geojsonCells(colors: List<String>): FeatureCollection{
+        fun geojsonCells(colors: List<String>): FeatureCollection {
             val cells = getCells()
             val collection = FeatureCollection.fromFeatures(cells.mapIndexed { i, cell ->
-                val points = List(cell.size/2) {
-                    j -> Point.fromLngLat(cell[j*2],cell[j*2+1])
+                val points = List(cell.size / 2) { j ->
+                    Point.fromLngLat(cell[j * 2], cell[j * 2 + 1])
                 }
                 val geometry = Polygon.fromLngLats(listOf(points))
                 val feature = Feature.fromGeometry(geometry, JsonObject().apply {

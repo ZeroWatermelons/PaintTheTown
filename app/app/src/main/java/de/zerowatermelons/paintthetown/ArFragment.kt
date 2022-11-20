@@ -6,6 +6,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.widget.SectionIndexer
 import android.widget.Toast
+import androidx.core.os.bundleOf
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
@@ -41,6 +42,9 @@ class ArFragment : Fragment(R.layout.fragment_ar) {
     private var session: Session? = null
     private var anchor: Anchor? = null
 
+    private lateinit var team: Team
+
+
     private var model: Renderable? = null
     private var sModel: Renderable? = null
     private var modelView: ViewRenderable? = null
@@ -54,7 +58,11 @@ class ArFragment : Fragment(R.layout.fragment_ar) {
 
     private var n: Node? = null
 
-    inner class Bullet(var speed: Vector3, var rotationImpulseDirection: Vector3, var rotationImpulseSpeed: Float) {
+    inner class Bullet(
+        var speed: Vector3,
+        var rotationImpulseDirection: Vector3,
+        var rotationImpulseSpeed: Float
+    ) {
 
 
         fun update(dt: Float) {
@@ -70,7 +78,12 @@ class ArFragment : Fragment(R.layout.fragment_ar) {
                 this.node.localPosition.y + this.speed.y * dt,
                 this.node.localPosition.z + this.speed.z * dt
             )
-            this.node.localRotation = Quaternion.multiply(Quaternion.axisAngle(rotationImpulseDirection, rotationImpulseSpeed*dt), this.node.localRotation)
+            this.node.localRotation = Quaternion.multiply(
+                Quaternion.axisAngle(
+                    rotationImpulseDirection,
+                    rotationImpulseSpeed * dt
+                ), this.node.localRotation
+            )
         }
 
         lateinit var node: Node
@@ -95,7 +108,8 @@ class ArFragment : Fragment(R.layout.fragment_ar) {
             var mis = node.renderableInstance.filamentAsset!!.materialInstances
             for (mi in mis) {
                 mi.setColorWrite(true)
-                mi.setParameter("baseColorFactor", 1.0f, 0.0f, 0.0f)
+                val color = colorFromTeam(team)
+                mi.setParameter("baseColorFactor", color.r,color.g,color.b)
             }
         }
     }
@@ -104,6 +118,8 @@ class ArFragment : Fragment(R.layout.fragment_ar) {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        team = arguments?.getSerializable(TEAM) as Team
 
         arFragment = (childFragmentManager.findFragmentById(R.id.arFragment) as ArFragment).apply {
             setOnSessionConfigurationListener { session, config ->
@@ -259,8 +275,9 @@ class ArFragment : Fragment(R.layout.fragment_ar) {
         //finish
         var b = Bundle()
         b.putBoolean(STATUS, true)
-        Toast.makeText(context, "Yay", Toast.LENGTH_SHORT)
-        //findNavController().navigate(R.id.action_ArFragment_to_SecondFragment, b)
+        Toast.makeText(context, "Yay", Toast.LENGTH_LONG)
+        if (findNavController().currentDestination?.id == R.id.ArFragment)
+            findNavController().navigate(R.id.action_ArFragment_to_SecondFragment, bundleOf(TEAM to team))
     }
 
     fun fireShotForRotation(index: Int) {
@@ -296,12 +313,12 @@ class ArFragment : Fragment(R.layout.fragment_ar) {
 
         var b = Bullet(
             Vector3(2.0f * x, Random.nextDouble(3.0, 5.0).toFloat(), 2.0f * z),
-                Vector3(
-                    Random.nextFloat(),
-                    Random.nextFloat(),
-                    Random.nextFloat()
-                ).normalized(),
-            Random.nextFloat()*720
+            Vector3(
+                Random.nextFloat(),
+                Random.nextFloat(),
+                Random.nextFloat()
+            ).normalized(),
+            Random.nextFloat() * 720
         )
         //var b = Bullet(Vector3(0.0f, 5.0f, 50.0f))
         this.bullets.add(b)
@@ -327,7 +344,8 @@ class ArFragment : Fragment(R.layout.fragment_ar) {
         var ts = TextureSampler()
         for (mi in mis) {
             mi.setColorWrite(true)
-            mi.setParameter("baseColorFactor", 1.0f, 0.0f, 0.0f)
+            val color = colorFromTeam(team)
+            mi.setParameter("baseColorFactor", color.r,color.g,color.b)
         }
 
     }
@@ -350,6 +368,14 @@ class ArFragment : Fragment(R.layout.fragment_ar) {
             2 * (quaternion.w * quaternion.y + quaternion.z * quaternion.x),
             1 - 2 * (quaternion.x * quaternion.x + quaternion.y * quaternion.y)
         )
+    }
+
+    fun colorFromTeam(team: Team): Color {
+        return when (team) {
+            Team.RED -> Color(0.77f,0.01f,0.15f)
+            Team.YELLOW -> Color(1f,0.6f,0.0f)
+            Team.BLUE -> Color(0f,0.43f,0.9f)
+        }
     }
 }
 

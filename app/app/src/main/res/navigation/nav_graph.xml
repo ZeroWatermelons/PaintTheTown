@@ -14,9 +14,6 @@
         <action
             android:id="@+id/action_FirstFragment_to_SecondFragment"
             app:destination="@id/SecondFragment" />
-        <action
-            android:id="@+id/action_FirstFragment_to_fragment_ar"
-            app:destination="@id/ArFragment" />
     </fragment>
     <fragment
         android:id="@+id/SecondFragment"
@@ -37,7 +34,9 @@
         android:label="@string/ar_fragment_label"
         tools:layout="@layout/fragment_ar">
 
-        <action android:id="@+id/action_ArFragment_to_SecondFragment"
-            app:destination="@id/SecondFragment" />
+        <action
+            android:id="@+id/action_ArFragment_to_SecondFragment"
+            app:destination="@id/SecondFragment"
+            app:popUpToInclusive="@id/SecondFragment"/>
     </fragment>
 </navigation>
