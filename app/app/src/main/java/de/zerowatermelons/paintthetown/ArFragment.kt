@@ -43,6 +43,7 @@ class ArFragment : Fragment(R.layout.fragment_ar) {
     private var anchor: Anchor? = null
 
     private lateinit var team: Team
+    private lateinit var osmid: String
 
 
     private var model: Renderable? = null
@@ -120,6 +121,7 @@ class ArFragment : Fragment(R.layout.fragment_ar) {
         super.onViewCreated(view, savedInstanceState)
 
         team = arguments?.getSerializable(TEAM) as Team
+        osmid = arguments?.getString(OSM_ID)!!
 
         arFragment = (childFragmentManager.findFragmentById(R.id.arFragment) as ArFragment).apply {
             setOnSessionConfigurationListener { session, config ->
@@ -277,7 +279,7 @@ class ArFragment : Fragment(R.layout.fragment_ar) {
         b.putBoolean(STATUS, true)
         Toast.makeText(context, "Yay", Toast.LENGTH_LONG)
         if (findNavController().currentDestination?.id == R.id.ArFragment)
-            findNavController().navigate(R.id.action_ArFragment_to_SecondFragment, bundleOf(TEAM to team))
+            findNavController().navigate(R.id.action_ArFragment_to_SecondFragment, bundleOf(TEAM to team, OSM_ID to osmid))
     }
 
     fun fireShotForRotation(index: Int) {

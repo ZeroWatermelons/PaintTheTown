@@ -22,8 +22,10 @@ import com.mapbox.geojson.Polygon
 import com.mapbox.maps.*
 import com.mapbox.maps.extension.style.expressions.dsl.generated.get
 import com.mapbox.maps.extension.style.expressions.dsl.generated.interpolate
+import com.mapbox.maps.extension.style.layers.addLayer
 import com.mapbox.maps.extension.style.layers.addLayerAbove
 import com.mapbox.maps.extension.style.layers.generated.FillLayer
+import com.mapbox.maps.extension.style.layers.generated.circleLayer
 import com.mapbox.maps.extension.style.layers.generated.fillLayer
 import com.mapbox.maps.extension.style.sources.addSource
 import com.mapbox.maps.extension.style.sources.generated.GeoJsonSource
@@ -49,6 +51,7 @@ import kotlin.random.Random
 
 const val OSM_ID = "osm_id"
 const val OSM_ISSUES = "osm-issues"
+const val OSM_ISSUES_MOCK = "osm-issues-mock"
 const val STYLE = "mapbox://styles/fabiannowak/clanul8lp005d14o33kq78sg5/draft"
 const val TEAM = "team"
 
@@ -109,7 +112,7 @@ class SecondFragment : Fragment() {
         val boxTo = ScreenCoordinate(screenpoint.x + 10, screenpoint.y + 10)
         mapboxMap.queryRenderedFeatures(
             RenderedQueryGeometry(ScreenBox(boxFrom, boxTo)), RenderedQueryOptions(
-                listOf(OSM_ISSUES), Value.valueOf("")
+                listOf(OSM_ISSUES_MOCK), Value.valueOf("")
             )
         ) {
             val featureId = it.value?.getOrNull(0)?.feature?.getStringProperty("osm_id")
@@ -124,10 +127,12 @@ class SecondFragment : Fragment() {
         }
         false
     }
-    private val onVoronoiCalculated = { featureCollection: FeatureCollection ->
+    private val onVoronoiCalculated = { featureCollection: FeatureCollection, featureCollectionPoints: FeatureCollection ->
         val mapboxMap = mapView.getMapboxMap()
         val geojsonsource = mapboxMap.getStyle()?.getSource("voronoi") as GeoJsonSource
         geojsonsource.featureCollection(featureCollection)
+        val geojsonsourceMock = mapboxMap.getStyle()?.getSource("osm-mock-source") as GeoJsonSource
+        geojsonsourceMock.featureCollection(featureCollectionPoints)
         Unit
     }
 
@@ -148,9 +153,25 @@ class SecondFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        team = arguments?.getSerializable("selectedTeam") as? Team ?: arguments?.getSerializable(
-            TEAM
-        ) as? Team ?: savedInstanceState?.getSerializable("team") as Team
+        apiAccess = ApiAccessMock(requireContext().assets)
+        var team = arguments?.getSerializable("selectedTeam") as? Team
+        var osmid: String? = null
+        if (team == null) {
+            team = arguments?.getSerializable(TEAM) as? Team
+            osmid = arguments?.getString(OSM_ID)
+        }
+        if(team == null) {
+            team = savedInstanceState?.getSerializable(TEAM) as? Team
+        }
+        this.team = team!!
+        println("FIIIINISHED: "+osmid)
+        println("FIIIINISHED: "+arguments)
+        if(osmid != null) {
+            apiAccess.assignSplashzone(osmid, team) {
+                //voronoiManager.onMapViewportChanged()
+            }
+        }
+
         val toolbar = view.findViewById<MaterialToolbar>(R.id.toolbar)
         val teamName = when (team) {
             Team.RED -> "Red"
@@ -166,7 +187,6 @@ class SecondFragment : Fragment() {
         }
         mapView = view.findViewById(R.id.mapView)
 
-        apiAccess = ApiAccessMock(requireContext().assets)
 
         locationPermissionHelper = LocationPermissionHelper(WeakReference(this.activity))
         locationPermissionHelper.checkPermissions {
@@ -179,7 +199,7 @@ class SecondFragment : Fragment() {
         val mapboxMap = mapView.getMapboxMap()
         mapboxMap.setCamera(
             CameraOptions.Builder()
-                .zoom(17.0)
+                .zoom(11.0)
                 .build()
         )
         mapboxMap.loadStyleUri(
@@ -191,6 +211,13 @@ class SecondFragment : Fragment() {
                     fillOpacity(0.2)
                     fillColor(get("color"))
                 }, "road-simple"
+            )
+            it.addSource(geoJsonSource("osm-mock-source"))
+            it.addLayer(
+                circleLayer(OSM_ISSUES_MOCK, "osm-mock-source") {
+                    circleColor("#5555EE")
+                    circleRadius(7.0)
+                }
             )
             initLocationComponent()
             setupGesturesListener()
@@ -240,7 +267,7 @@ class SecondFragment : Fragment() {
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         println("XXXXX save")
-        outState.putSerializable("team", team)
+        outState.putSerializable(TEAM, team)
     }
 
     override fun onDestroyView() {
@@ -300,7 +327,7 @@ class SecondFragment : Fragment() {
 
         val EXTEND_BOX = 1.5f
         var voronoi: Voronoi? = null
-        var onJsonUpdated: ((FeatureCollection) -> Unit)? = null
+        var onJsonUpdated: ((FeatureCollection, FeatureCollection) -> Unit)? = null
         private var runnable: CancelDelayedRunnable? = null
         private var executor: Executor = Executors.newSingleThreadExecutor()
 
@@ -352,7 +379,10 @@ class SecondFragment : Fragment() {
                     Point.fromLngLat(it.long, it.lat)
                 }
                 val colors = result.map {
-                    it.owner
+                    colorFromTeam(it.team)
+                }
+                val osmids = result.map {
+                    it.osmid
                 }
                 val maxlatitude = points.maxOf { it.latitude() }
                 val maxlongitude = points.maxOf { it.longitude() }
@@ -373,7 +403,8 @@ class SecondFragment : Fragment() {
                 getCells()
                 //TODO use actual color list (via db access etc)
                 val jsoncells = geojsonCells(colors)
-                Handler(Looper.getMainLooper()).post { onJsonUpdated?.invoke(jsoncells) }
+                val jsonpoints = geojsonPoints(points,osmids)
+                Handler(Looper.getMainLooper()).post { onJsonUpdated?.invoke(jsoncells,jsonpoints) }
             }
         }
 
@@ -397,5 +428,24 @@ class SecondFragment : Fragment() {
             println(collection.toJson())
             return collection
         }
+
+        fun geojsonPoints(points: List<Point>, osmids: List<String>): FeatureCollection {
+            val collection = FeatureCollection.fromFeatures(points.mapIndexed { i, point ->
+                val feature = Feature.fromGeometry(point, JsonObject().apply {
+                    addProperty("osm_id", osmids[i])
+                })
+                feature
+            }.toTypedArray())
+            return collection
+        }
+    }
+
+}
+
+fun colorFromTeam(team: Team): String {
+    return when (team) {
+        Team.RED -> "#C40233"
+        Team.BLUE -> "#0087BD"
+        Team.YELLOW -> "#FFD300"
     }
 }

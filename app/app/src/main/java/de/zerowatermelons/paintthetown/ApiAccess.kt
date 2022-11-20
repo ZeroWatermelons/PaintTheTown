@@ -6,5 +6,9 @@ class ApiAccess: IApiAccess {
         TODO("Not yet implemented")
     }
 
+    override fun assignSplashzone(osmid: String, team: Team, callback: () -> Unit) {
+        TODO("Not yet implemented")
+    }
+
 
 }
